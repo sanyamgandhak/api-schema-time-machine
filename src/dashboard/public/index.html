@@ -436,16 +436,7 @@
       span.title = ep.path;
       span.textContent = ep.path;
 
-      const badge = document.createElement('span');
-      badge.className = 'badge';
-      badge.textContent = ep.change_count;
-
-      pill.appendChild(span);
-      pill.appendChild(badge);
-      pill.addEventListener('click', () => selectEndpoint(ep.path));
-      list.appendChild(pill);
-    });
-  }
+  
 
   // ── Detail view ──────────────────────────────────────────────────────────
 
