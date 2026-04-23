@@ -52,4 +52,3 @@ function diff(oldSchema, newSchema) {
   return { added, removed, changed, renamed, timestamp: new Date().toISOString() };
 }
 
-module.exports = { diff };
