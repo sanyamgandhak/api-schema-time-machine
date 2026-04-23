@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>schema tracker</title>
+<style>
+  :root {
+    --bg: #f5f5f5;
+    --surface: #ffffff;
+    --border: #e0e0e0;
+    --text: #1a1a1a;
+    --text-muted: #6b7280;
+    --accent: #3b82f6;
+    --accent-bg: #eff6ff;
+    --added: #16a34a;
+    --added-bg: #f0fdf4;
+    --removed: #dc2626;
+    --removed-bg: #fef2f2;
+    --changed: #d97706;
+    --changed-bg: #fffbeb;
+    --renamed: #7c3aed;
+    --renamed-bg: #f5f3ff;
+    --sidebar-w: 260px;
+    --radius: 8px;
+    --mono: 'SF Mono', 'Fira Mono', 'Cascadia Code', Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2d3148;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #60a5fa;
+      --accent-bg: #1e3a5f;
+      --added: #4ade80;
+      --added-bg: #052e16;
+      --removed: #f87171;
+      --removed-bg: #2d0a0a;
+      --changed: #fbbf24;
+      --changed-bg: #2d1a00;
+      --renamed: #a78bfa;
+      --renamed-bg: #1e1040;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 20px 16px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #sidebar-header h1 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  #sidebar-header .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 6px;
+    vertical-align: middle;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  #endpoint-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .endpoint-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+  }
+
+  .endpoint-pill:hover { background: var(--border); color: var(--text); }
+  .endpoint-pill.active { background: var(--accent-bg); color: var(--accent); }
+
+  .endpoint-pill .ep-path {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .badge {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 600;
+    background: var(--border);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 1px 6px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .endpoint-pill.active .badge { background: var(--accent); color: #fff; }
+
+  #empty-sidebar {
+    padding: 24px 16px;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  /* ── Main ── */
+  #main {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  #empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  #empty-state .icon { font-size: 40px; }
+  #empty-state p     { font-size: 14px; }
+
+  /* #content: always display:flex in CSS; toggled with hidden attr in JS */
+  #content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 28px 32px;
+  }
+
+  /* ── Endpoint header ── */
+  #ep-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  #ep-title {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  #ep-meta { font-size: 13px; color: var(--text-muted); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .card-timestamp {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+  }
+
+  .card-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ── Diff rows ── */
+  .diff-section { display: flex; flex-direction: column; gap: 4px; }
+
+  .diff-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+
+  .diff-row {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  .diff-row.added   { background: var(--added-bg);   color: var(--added);   }
+  .diff-row.removed { background: var(--removed-bg); color: var(--removed); }
+  .diff-row.changed { background: var(--changed-bg); color: var(--changed); }
+  .diff-row.renamed { background: var(--renamed-bg); color: var(--renamed); }
+
+  .diff-sigil { font-weight: 700; flex-shrink: 0; }
+  .diff-key   { flex: 1; }
+
+  .no-changes { font-size: 13px; color: var(--text-muted); padding: 8px 0; }
+
+  /* ── History ── */
+  #history-section h2 {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  #history-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .snapshot-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .snapshot-header {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+  }
+
+  .snapshot-header:hover { background: var(--bg); }
+
+  .snapshot-index {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+    background: var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    flex-shrink: 0;
+  }
+
+  .snapshot-ts {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+    flex: 1;
+  }
+
+  .snapshot-toggle {
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+  }
+
+  .snapshot-toggle.open { transform: rotate(90deg); }
+
+  .snapshot-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 12px 14px;
+    overflow-x: auto;
+  }
+
+  .snapshot-body.open { display: block; }
+
+  .snapshot-body pre {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    white-space: pre;
+    line-height: 1.6;
+  }
+
+  /* error banner */
+  #error-bar {
+    background: var(--removed-bg);
+    color: var(--removed);
+    font-size: 12px;
+    font-family: var(--mono);
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <div id="sidebar-header">
+    <h1><span class="dot"></span>schema tracker</h1>
+  </div>
+  <div id="endpoint-list">
+    <div id="empty-sidebar">No endpoints tracked yet.<br>Make a request through the proxy.</div>
+  </div>
+</nav>
+
+<main id="main">
+  <div id="empty-state">
+    <div class="icon">🕰</div>
+    <p>Select an endpoint to view schema history</p>
+  </div>
+
+  <!-- hidden attr keeps it out of layout until JS removes it -->
+  <div id="content" hidden>
+    <div id="ep-header">
+      <span id="ep-title"></span>
+      <span id="ep-meta"></span>
+    </div>
+
+    <!-- diff card: hidden until data loads -->
+    <div id="diff-card" class="card" hidden>
+      <div class="card-header">
+        <span class="card-title">Latest change</span>
+        <span class="card-timestamp" id="diff-ts"></span>
+      </div>
+      <div class="card-body" id="diff-body"></div>
+    </div>
+
+    <div id="history-section">
+      <h2>History</h2>
+      <div id="history-list"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // strip trailing slash so BASE works whether path ends with / or not
+  const BASE = window.location.pathname.replace(/\/$/, '');
+
+  let selectedEndpoint = null;
+  let endpoints = [];
+
+  // ── Sidebar ──────────────────────────────────────────────────────────────
+
+  async function fetchEndpoints() {
+    try {
+      const res = await fetch(BASE + '/api/endpoints');
+      if (!res.ok) return;
+      endpoints = await res.json();
+      renderSidebar();
+    } catch (e) {
+      console.error('[schema-tracker] fetchEndpoints failed:', e);
+    }
+  }
+
+  function renderSidebar() {
+    const list  = document.getElementById('endpoint-list');
+    const empty = document.getElementById('empty-sidebar');
+    console.log(list,"list")
+    console.log(empty,"empty")
+
+    if (!endpoints.length) {
+      if (!list.contains(empty)) list.appendChild(empty);
+      empty.hidden = false;
+      return;
+    }
+
+    empty.hidden = true;
+    list.querySelectorAll('.endpoint-pill').forEach(el => el.remove());
+
+    endpoints.forEach(ep => {
+      const pill = document.createElement('div');
+      pill.className = 'endpoint-pill' + (ep.path === selectedEndpoint ? ' active' : '');
+
+      const span = document.createElement('span');
+      span.className = 'ep-path';
+      span.title = ep.path;
+      span.textContent = ep.path;
+
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = ep.change_count;
+
+      pill.appendChild(span);
+      pill.appendChild(badge);
+      pill.addEventListener('click', () => selectEndpoint(ep.path));
+      list.appendChild(pill);
+    });
+  }
+
+  // ── Detail view ──────────────────────────────────────────────────────────
+
+  async function selectEndpoint(path) {
+    try {
+      selectedEndpoint = path;
+      renderSidebar();
+
+      // Show content panel, hide the empty state
+      document.getElementById('empty-state').hidden = true;
+      document.getElementById('content').hidden = false;
+      document.getElementById('diff-card').hidden = true;
+
+      document.getElementById('ep-title').textContent = path;
+      document.getElementById('ep-meta').textContent  = 'loading…';
+      document.getElementById('history-list').innerHTML = '';
+
+      const key = btoa(unescape(encodeURIComponent(path)));
+
+      const [histRes, diffRes] = await Promise.all([
+        fetch(BASE + '/api/history/'  + encodeURIComponent(key)),
+        fetch(BASE + '/api/diff/'     + encodeURIComponent(key)),
+      ]);
+
+      const history  = histRes.ok ? await histRes.json() : [];
+      const diffData = diffRes.ok ? await diffRes.json() : { diff: null };
+
+      const ep = endpoints.find(e => e.path === path);
+      document.getElementById('ep-meta').textContent =
+        `${history.length} snapshot${history.length !== 1 ? 's' : ''}` +
+        (ep ? ` · ${ep.change_count} change${ep.change_count !== 1 ? 's' : ''}` : '');
+
+      renderDiff(diffData);
+      renderHistory(history);
+    } catch (e) {
+      console.error('[schema-tracker] selectEndpoint failed:', e);
+      showError(e.message);
+    }
+  }
+
+  // ── Diff card ─────────────────────────────────────────────────────────────
+
+  function renderDiff({ diff, detected_at }) {
+    const card = document.getElementById('diff-card');
+    const body = document.getElementById('diff-body');
+    const ts   = document.getElementById('diff-ts');
+
+    if (!diff) { card.hidden = true; return; }
+
+    card.hidden = false;
+    ts.textContent  = detected_at ? new Date(detected_at).toLocaleString() : '';
+    body.innerHTML  = '';
+
+    const sections = [
+      { key: 'added',   label: 'Added',   sigil: '+', cls: 'added',
+        fmt: (k, v) => `${k}: ${v}` },
+      { key: 'removed', label: 'Removed', sigil: '−', cls: 'removed',
+        fmt: (k, v) => `${k}: ${v}` },
+      { key: 'changed', label: 'Changed', sigil: '~', cls: 'changed',
+        fmt: (k, v) => `${k}:  ${v.from}  →  ${v.to}` },
+      { key: 'renamed', label: 'Renamed', sigil: '→', cls: 'renamed',
+        fmt: (k, v) => `${k}: ${v}` },
+    ];
+
+    let any = false;
+    sections.forEach(({ key, label, sigil, cls, fmt }) => {
+      const entries = Object.entries(diff[key] || {});
+      if (!entries.length) return;
+      any = true;
+
+      const sec = document.createElement('div');
+      sec.className = 'diff-section';
+
+      const lbl = document.createElement('div');
+      lbl.className   = 'diff-label';
+      lbl.textContent = label;
+      sec.appendChild(lbl);
+
+      entries.forEach(([k, v]) => {
+        const row = document.createElement('div');
+        row.className = `diff-row ${cls}`;
+
+        const sigEl = document.createElement('span');
+        sigEl.className   = 'diff-sigil';
+        sigEl.textContent = sigil;
+
+        const keyEl = document.createElement('span');
+        keyEl.className   = 'diff-key';
+        keyEl.textContent = fmt(k, v);
+
+        row.appendChild(sigEl);
+        row.appendChild(keyEl);
+        sec.appendChild(row);
+      });
+
+      body.appendChild(sec);
+    });
+
+    if (!any) {
+      const msg = document.createElement('span');
+      msg.className   = 'no-changes';
+      msg.textContent = 'No structural changes detected.';
+      body.appendChild(msg);
+    }
+  }
+
+  // ── History list ──────────────────────────────────────────────────────────
+
+  function renderHistory(history) {
+    const list = document.getElementById('history-list');
+    list.innerHTML = '';
+
+    if (!history.length) {
+      list.textContent = 'No snapshots yet.';
+      list.style.color = 'var(--text-muted)';
+      list.style.fontSize = '13px';
+      return;
+    }
+    list.style.color = '';
+    list.style.fontSize = '';
+
+    // newest first
+    [...history].reverse().forEach((snap, i) => {
+      const num = history.length - i;
+
+      const card   = document.createElement('div');
+      card.className = 'snapshot-card';
+
+      const hdr = document.createElement('div');
+      hdr.className = 'snapshot-header';
+
+      const idx = document.createElement('span');
+      idx.className   = 'snapshot-index';
+      idx.textContent = `#${num}`;
+
+      const ts = document.createElement('span');
+      ts.className   = 'snapshot-ts';
+      ts.textContent = new Date(snap.captured_at).toLocaleString();
+
+      const tog = document.createElement('span');
+      tog.className   = 'snapshot-toggle';
+      tog.textContent = '▶';
+
+      hdr.appendChild(idx);
+      hdr.appendChild(ts);
+      hdr.appendChild(tog);
+
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'snapshot-body';
+
+      const pre = document.createElement('pre');
+      try { pre.textContent = JSON.stringify(JSON.parse(snap.schema), null, 2); }
+      catch { pre.textContent = snap.schema; }
+      bodyEl.appendChild(pre);
+
+      hdr.addEventListener('click', () => {
+        const open = bodyEl.classList.toggle('open');
+        tog.classList.toggle('open', open);
+      });
+
+      card.appendChild(hdr);
+      card.appendChild(bodyEl);
+      list.appendChild(card);
+    });
+  }
+
+  // ── Error banner ──────────────────────────────────────────────────────────
+
+  function showError(msg) {
+    let bar = document.getElementById('error-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'error-bar';
+      document.getElementById('content').prepend(bar);
+    }
+    bar.textContent = '⚠ ' + msg;
+    bar.hidden = false;
+    setTimeout(() => { bar.hidden = true; }, 6000);
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+
+  fetchEndpoints();
+  setInterval(fetchEndpoints, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "name": "api-schema-time-machine",
+  "version": "0.1.0",
+  "description": "Zero-config API response schema tracker — plug into any Express app",
+  "main": "src/index.js",
+  "license": "MIT",
+  "author": "gandhaksanyam@gmail.com",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "node example/server.js",
+    "seed": "node example/seed.js",
+    "test": "node --test src/__tests__/*.test.js"
+  },
+  "keywords": [
+    "api",
+    "schema",
+    "diff",
+    "proxy",
+    "express",
+    "middleware",
+    "monitoring",
+    "tracking"
+  ],
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "peerDependencies": {
+    "pg": "^8.11.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.1",
+    "express": "^5.2.1"
+  }
+}
