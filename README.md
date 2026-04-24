@@ -1,8 +1,8 @@
 # api-schema-time-machine
 
-[![npm version](https://img.shields.io/npm/v/api-schema-time-machine)](https://www.npmjs.com/package/api-schema-time-machine)
-[![license](https://img.shields.io/npm/l/api-schema-time-machine)](./LICENSE)
-[![node](https://img.shields.io/node/v/api-schema-time-machine)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/@phonepe/api-schema-time-machine)](https://artifactory.phonepe.com/repository/npm-releases/@phonepe/api-schema-time-machine)
+[![license](https://img.shields.io/npm/l/@phonepe/api-schema-time-machine)](./LICENSE)
+[![node](https://img.shields.io/node/v/@phonepe/api-schema-time-machine)](https://nodejs.org)
 
 Zero-config API response schema tracker — plug into any Express app and automatically detect when your upstream API responses change shape.
 
@@ -13,14 +13,14 @@ Upstream APIs change silently. A field gets renamed, a type switches from `strin
 ## Install
 
 ```bash
-npm install api-schema-time-machine
+pnpm add @phonepe/api-schema-time-machine
 ```
 
 ## Quickstart
 
 ```js
 const express = require('express');
-const { schemaTracker } = require('api-schema-time-machine');
+const { schemaTracker } = require('@phonepe/api-schema-time-machine');
 
 const app = express();
 

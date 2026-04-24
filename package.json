@@ -1,5 +1,5 @@
 {
-  "name": "api-schema-time-machine",
+  "name": "@phonepe/api-schema-time-machine",
   "version": "0.1.0",
   "description": "Zero-config API response schema tracker — plug into any Express app",
   "main": "src/index.js",
@@ -38,6 +38,9 @@
     "pg": {
       "optional": true
     }
+  },
+  "publishConfig": {
+    "registry": "https://artifactory.phonepe.com/repository/npm-releases"
   },
   "devDependencies": {
     "dotenv": "^16.4.1",
